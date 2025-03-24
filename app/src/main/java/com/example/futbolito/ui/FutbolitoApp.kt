@@ -11,34 +11,44 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import dev.ricknout.composesensors.accelerometer.isAccelerometerSensorAvailable
 import dev.ricknout.composesensors.accelerometer.rememberAccelerometerSensorValueAsState
+import kotlinx.coroutines.delay
 
-// Definir colores personalizados
-val fieldColor = Color(0xFF0A662F) // Verde oscuro para la cancha
-val goalColor = Color(0xFFFFFFFF) // Blanco para las porterías
-val ballColor = Color(0xFF1E90FF) // Azul brillante para la pelota
+val fieldColor = Color(0xFF0A662F)
+val goalColor = Color(0xFFFFFFFF)
+val ballColor = Color(0xFFE8B002)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FutbolitoApp() {
     if (isAccelerometerSensorAvailable()) {
         val sensorValue by rememberAccelerometerSensorValueAsState()
-        val (x, y, _) = sensorValue.value
+        val (sensorAceleracionX, sensorAceleracionY, _) = sensorValue.value
 
-        var ballPosition by remember { mutableStateOf(Offset(500f, 800f)) }
-        var scoreTeamA by remember { mutableIntStateOf(0) }
-        var scoreTeamB by remember { mutableIntStateOf(0) }
+        var balonPosicionX by remember { mutableFloatStateOf(500f) }
+        var balonPosicionY by remember { mutableFloatStateOf(800f) }
+        var velocidadX by remember { mutableFloatStateOf(0f) }
+        var velocidadY by remember { mutableFloatStateOf(0f) }
+        var golesEquipoA by remember { mutableIntStateOf(0) }
+        var golesEquipoB by remember { mutableIntStateOf(0) }
 
-        val ballSize = 20f
+        val tamanoBalon = 25f
+        val sensibilidad = 1.5f
+        val friccion = 0.92f
+        val restitucion = 0.9f
 
-        // Ajustar la posición de la pelota según el acelerómetro
-        LaunchedEffect(x, y) {
-            ballPosition = Offset(
-                (ballPosition.x - x * 10),
-                (ballPosition.y + y * 10)
-            )
+        // Movimiento basado en acelerómetro
+        LaunchedEffect(sensorAceleracionX, sensorAceleracionY) {
+            velocidadX += -sensorAceleracionX * sensibilidad
+            velocidadY += sensorAceleracionY * sensibilidad
+
+            velocidadX *= friccion
+            velocidadY *= friccion
+
+            balonPosicionX += velocidadX
+            balonPosicionY += velocidadY
+
         }
 
         Scaffold(
@@ -46,7 +56,7 @@ fun FutbolitoApp() {
                 TopAppBar(
                     title = {
                         Text(
-                            "Equipo A: $scoreTeamA",
+                            "Equipo A: $golesEquipoA",
                             style = MaterialTheme.typography.titleLarge,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
@@ -56,11 +66,9 @@ fun FutbolitoApp() {
             },
             bottomBar = {
                 BottomAppBar {
-                    Box(modifier = Modifier
-                        .fillMaxWidth(),
-                        contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text(
-                            "Equipo B: $scoreTeamB",
+                            "Equipo B: $golesEquipoB",
                             style = MaterialTheme.typography.bodyLarge,
                             textAlign = TextAlign.Center
                         )
@@ -72,125 +80,130 @@ fun FutbolitoApp() {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-
             ) {
-                Canvas(modifier = Modifier
-                    .fillMaxSize()
-                ) {
-                    val canvasWidth = size.width
-                    val canvasHeight = size.height
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val anchoCanvas = size.width
+                    val altoCanvas = size.height
 
-                    // Definir área de juego dentro de la pantalla
-                    val margin = 50f
-                    val canchaWidth = canvasWidth - 2 * margin
-                    val canchaHeight = canvasHeight - 2 * margin
+                    val margen = 50f
+                    val anchoCancha = anchoCanvas - (2 * margen)
+                    val altoCancha = altoCanvas - (2 * margen)
 
-                    // Dibujar la cancha
+                    // Dibujar cancha
                     drawRect(
                         color = fieldColor,
                         topLeft = Offset(0f, 0f),
-                        size = Size(canvasWidth, canvasHeight)
+                        size = Size(anchoCanvas, altoCanvas)
                     )
-
-                    // Dibujar las líneas blancas del campo
                     drawRect(
                         color = goalColor,
-                        topLeft = Offset(margin, margin),
-                        size = Size(canchaWidth, canchaHeight),
+                        topLeft = Offset(margen, margen),
+                        size = Size(anchoCancha, altoCancha),
                         style = Stroke(width = 10f)
                     )
 
                     // Dibujar porterías
-                    val goalWidth = 150f
-                    val goalHeight = 50f
-                    val goalBottomY = canvasHeight - margin
-                    val goalLeftX = (canvasWidth - goalWidth) / 2
-                    val goalRightX = goalLeftX + goalWidth
+                    val anchoPorteria = 150f
+                    val altoPorteria = 50f
+                    val coordenadaYPorteriaAbajo = altoCanvas - margen
+                    val coordenadaXIzquierdaPorteria = (anchoCanvas - anchoPorteria) / 2
+                    val coordenadaXDerechaPorteria = coordenadaXIzquierdaPorteria + anchoPorteria
 
                     drawRect(
                         color = goalColor,
-                        topLeft = Offset((canvasWidth - goalWidth) / 2 , 0f),
-                        size = Size(goalWidth, goalHeight),
+                        topLeft = Offset(coordenadaXIzquierdaPorteria, 0f),
+                        size = Size(anchoPorteria, altoPorteria),
                         style = Stroke(width = 10f)
                     )
                     drawRect(
                         color = goalColor,
-                        topLeft = Offset((canvasWidth - goalWidth) / 2, canchaHeight + goalHeight),
-                        size = Size(goalWidth, goalHeight),
+                        topLeft = Offset(coordenadaXIzquierdaPorteria, altoCancha + altoPorteria),
+                        size = Size(anchoPorteria, altoPorteria),
                         style = Stroke(width = 10f)
                     )
 
                     // Dibujar círculo central
                     drawCircle(
                         color = goalColor,
-                        center = Offset(canvasWidth / 2f, canvasHeight / 2f),
-                        radius = canchaWidth * 0.1f,
+                        center = Offset(anchoCanvas / 2f, altoCanvas / 2f),
+                        radius = anchoCancha * 0.1f,
                         style = Stroke(width = 10f)
                     )
 
                     // Línea central
                     drawLine(
                         color = goalColor,
-                        start = Offset(margin, canvasHeight / 2f),
-                        end = Offset(canvasWidth - margin, canvasHeight / 2f),
+                        start = Offset(margen, altoCanvas / 2f),
+                        end = Offset(anchoCanvas - margen, altoCanvas / 2f),
                         strokeWidth = 10f
                     )
 
                     // Dibujar áreas de meta
-                    val areaWidth = 300f
-                    val areaHeight = 100f
+                    val anchoMeta = 300f
+                    val altoMeta = 100f
                     drawRect(
                         color = goalColor,
-                        topLeft = Offset((canvasWidth - areaWidth) / 2, margin),
-                        size = Size(areaWidth, areaHeight),
+                        topLeft = Offset((anchoCanvas - anchoMeta) / 2, margen),
+                        size = Size(anchoMeta, altoMeta),
                         style = Stroke(width = 10f)
                     )
                     drawRect(
                         color = goalColor,
-                        topLeft = Offset((canvasWidth - areaWidth) / 2, canchaHeight - areaHeight + margin),
-                        size = Size(areaWidth, areaHeight),
+                        topLeft = Offset((anchoCanvas - anchoMeta) / 2, altoCancha - altoMeta + margen),
+                        size = Size(anchoMeta, altoMeta),
                         style = Stroke(width = 10f)
                     )
 
 
                     // Dibujar áreas de penalti
-                    val areaPenalWidth = 600f
-                    val areaPenalHeight = 250f
+                    val anchoAreaPenal = 600f
+                    val altoAreaPenal = 250f
                     drawRect(
                         color = goalColor,
-                        topLeft = Offset((canvasWidth - areaPenalWidth) / 2, margin),
-                        size = Size(areaPenalWidth, areaPenalHeight),
+                        topLeft = Offset((anchoCanvas - anchoAreaPenal) / 2, margen),
+                        size = Size(anchoAreaPenal, altoAreaPenal),
                         style = Stroke(width = 10f)
                     )
                     drawRect(
                         color = goalColor,
-                        topLeft = Offset((canvasWidth - areaPenalWidth) / 2, canchaHeight - areaPenalHeight + margin),
-                        size = Size(areaPenalWidth, areaPenalHeight),
+                        topLeft = Offset((anchoCanvas - anchoAreaPenal) / 2, altoCancha - altoAreaPenal + margen),
+                        size = Size(anchoAreaPenal, altoAreaPenal),
                         style = Stroke(width = 10f)
                     )
 
+                    // Detectar si la pelota toca la portería
+                    val golEquipoB = balonPosicionY - tamanoBalon <= margen && balonPosicionX in coordenadaXIzquierdaPorteria..coordenadaXDerechaPorteria
+                    val golEquipoA = balonPosicionY + tamanoBalon >= coordenadaYPorteriaAbajo && balonPosicionX in coordenadaXIzquierdaPorteria..coordenadaXDerechaPorteria
 
-                    // Dibujar la pelota y asegurar que no salga de la cancha
-                    val adjustedBallX = ballPosition.x.coerceIn(margin + ballSize, canvasWidth - margin - ballSize)
-                    val adjustedBallY = ballPosition.y.coerceIn(margin + ballSize, canvasHeight - margin - ballSize)
+                    if (golEquipoB) {
+                        golesEquipoB++
+                        balonPosicionX = anchoCanvas / 2
+                        balonPosicionY = altoCanvas / 2
+                        velocidadX = 0f
+                        velocidadY = 0f
+                    } else if (golEquipoA) {
+                        golesEquipoA++
+                        balonPosicionX = anchoCanvas / 2
+                        balonPosicionY = altoCanvas / 2
+                        velocidadX = 0f
+                        velocidadY = 0f
+                    }
+
+                    // Rebotes en las paredes
+                    if (balonPosicionX - tamanoBalon < margen || balonPosicionX + tamanoBalon > anchoCanvas - margen) {
+                        velocidadX = -velocidadX * restitucion
+                        balonPosicionX = balonPosicionX.coerceIn(margen + tamanoBalon, anchoCanvas - margen - tamanoBalon)
+                    }
+                    if (balonPosicionY - tamanoBalon < margen || balonPosicionY + tamanoBalon > altoCanvas - margen) {
+                        velocidadY = -velocidadY * restitucion
+                        balonPosicionY = balonPosicionY.coerceIn(margen + tamanoBalon, altoCanvas - margen - tamanoBalon)
+                    }
 
                     drawCircle(
                         ballColor,
-                        radius = ballSize,
-                        center = Offset(adjustedBallX, adjustedBallY)
+                        radius = tamanoBalon,
+                        center = Offset(balonPosicionX, balonPosicionY)
                     )
-
-                    // Detectar si la pelota toca la línea de la portería
-                    val ballTouchGoalTop = adjustedBallY - ballSize <= margin && adjustedBallX in goalLeftX..goalRightX
-                    val ballTouchGoalBottom = adjustedBallY + ballSize >= goalBottomY && adjustedBallX in goalLeftX..goalRightX
-
-                    if (ballTouchGoalTop) {
-                        scoreTeamA++
-                        ballPosition = Offset(canvasWidth / 2, canvasHeight / 2) // Reiniciar posición
-                    } else if (ballTouchGoalBottom) {
-                        scoreTeamB++
-                        ballPosition = Offset(canvasWidth / 2, canvasHeight / 2) // Reiniciar posición
-                    }
                 }
             }
         }
